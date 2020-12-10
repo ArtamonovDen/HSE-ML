@@ -1,22 +1,22 @@
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch.functional import norm
 
 from torch.utils.data import Dataset
-
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
 
 
 class VehicleLoanDataset(Dataset):
-    def __init__(self, csvpath, balance=True, mode='train', test_size = 0.2, random_state=42):
+    def __init__(self, csvpath, balance=True, normalize=False, mode='train', test_size = 0.2, random_state=42):
         raw_data = pd.read_csv(csvpath)  
+
+        self.mode = mode
+        self.normalize = normalize
         data = self._preprocess_data(raw_data)
         data = self._balance(data)
         self.data = data
-        self.mode = mode
 
         N,M = data.values.shape
         X =  data.values[:,:-1]
@@ -83,6 +83,16 @@ class VehicleLoanDataset(Dataset):
         data['AVERAGE.ACCT.AGE'] = self._preprocess_to_month_num(data, 'AVERAGE.ACCT.AGE')
         data['CREDIT.HISTORY.LENGTH'] = self._preprocess_to_month_num(data, 'CREDIT.HISTORY.LENGTH')
 
+        if self.normalize:
+            numeric_features = ['disbursed_amount', 'asset_cost', 'ltv', 'Date.of.Birth','PRI.NO.OF.ACCTS', 'PRI.ACTIVE.ACCTS', 'PRI.OVERDUE.ACCTS',
+                'PRI.CURRENT.BALANCE', 'PRI.SANCTIONED.AMOUNT', 'PRI.DISBURSED.AMOUNT',
+                'SEC.NO.OF.ACCTS', 'SEC.ACTIVE.ACCTS', 'SEC.OVERDUE.ACCTS',
+                'SEC.CURRENT.BALANCE', 'SEC.SANCTIONED.AMOUNT', 'SEC.DISBURSED.AMOUNT',
+                'PRIMARY.INSTAL.AMT', 'SEC.INSTAL.AMT', 'NEW.ACCTS.IN.LAST.SIX.MONTHS',
+                'DELINQUENT.ACCTS.IN.LAST.SIX.MONTHS', 'AVERAGE.ACCT.AGE',
+                'CREDIT.HISTORY.LENGTH','NO.OF_INQUIRIES' ]
+            data[numeric_features] = (data[numeric_features] - data[numeric_features].mean(axis = 0))/data[numeric_features].std(axis = 0)
+
         return data
 
 
@@ -90,26 +100,3 @@ class VehicleLoanDataset(Dataset):
         df_ = data[col].str.extractall('(\d+)').unstack()
         df_.columns = df_.columns.droplevel(0)
         return df_.iloc[:,0].astype(int).mul(12) + df_.iloc[:,1].astype(int)
-
-
-class Network(nn.Module):
-    def __init__(self):
-        super().__init__()
-        
-        # Inputs to hidden layer linear transformation
-        self.hidden = nn.Linear(784, 256)
-        # Output layer, 10 units - one for each digit
-        self.output = nn.Linear(256, 10)
-        
-        # Define sigmoid activation and softmax output 
-        self.sigmoid = nn.Sigmoid()
-        self.softmax = nn.Softmax(dim=1)
-        
-    def forward(self, x):
-        # Pass the input tensor through each of our operations
-        x = self.hidden(x)
-        x = self.sigmoid(x)
-        x = self.output(x)
-        x = self.softmax(x)
-        
-        return x
